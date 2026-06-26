@@ -1,0 +1,1096 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<title>Arjun's Day Tasks</title>
+<style>
+  :root {
+    --work-accent: #6366f1;
+    --work-accent-2: #8b5cf6;
+    --personal-accent: #0ea5e9;
+    --personal-accent-2: #2563eb;
+    --bg: #0f172a;
+    --panel: rgba(255, 255, 255, 0.06);
+    --panel-2: rgba(255, 255, 255, 0.03);
+    --panel-border: rgba(255, 255, 255, 0.1);
+    --text: #e2e8f0;
+    --text-dim: #94a3b8;
+    --danger: #ef4444;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+
+  html, body {
+    min-height: 100%;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    color: var(--text);
+    background: linear-gradient(135deg, #1e1b4b 0%, #0f172a 50%, #1e293b 100%);
+    background-attachment: fixed;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .app {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 24px 16px 100px;
+  }
+
+  header {
+    text-align: center;
+    margin-bottom: 28px;
+  }
+
+  header h1 {
+    font-size: clamp(28px, 6vw, 44px);
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    background: linear-gradient(90deg, var(--work-accent-2), var(--personal-accent));
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  header .date {
+    color: var(--text-dim);
+    font-size: 15px;
+    margin-top: 6px;
+  }
+
+  .progress-wrap {
+    max-width: 480px;
+    margin: 18px auto 0;
+    text-align: center;
+  }
+
+  .progress-bar {
+    height: 10px;
+    border-radius: 999px;
+    background: rgba(255,255,255,0.08);
+    overflow: hidden;
+    border: 1px solid var(--panel-border);
+  }
+
+  .progress-fill {
+    height: 100%;
+    width: 0%;
+    border-radius: 999px;
+    background: linear-gradient(90deg, var(--work-accent), var(--personal-accent));
+    transition: width 0.5s cubic-bezier(.4,0,.2,1);
+  }
+
+  .progress-label {
+    margin-top: 8px;
+    font-size: 13px;
+    color: var(--text-dim);
+  }
+
+  .columns {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 20px;
+  }
+
+  @media (min-width: 820px) {
+    .columns { grid-template-columns: 1fr 1fr; }
+  }
+
+  .column {
+    background: var(--panel);
+    border: 1px solid var(--panel-border);
+    border-radius: 22px;
+    padding: 22px;
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    box-shadow: 0 20px 50px rgba(0,0,0,0.25);
+    position: relative;
+    overflow: hidden;
+  }
+
+  .column.work::before,
+  .column.personal::before {
+    content: "";
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 4px;
+  }
+  .column.work::before { background: linear-gradient(90deg, var(--work-accent), var(--work-accent-2)); }
+  .column.personal::before { background: linear-gradient(90deg, var(--personal-accent), var(--personal-accent-2)); }
+
+  .col-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 14px;
+  }
+
+  .col-title {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 19px;
+    font-weight: 700;
+  }
+
+  .dot {
+    width: 12px; height: 12px; border-radius: 50%;
+  }
+  .dot.work { background: var(--work-accent); }
+  .dot.personal { background: var(--personal-accent); }
+
+  .count {
+    font-size: 13px;
+    color: var(--text-dim);
+    background: rgba(255,255,255,0.06);
+    padding: 4px 10px;
+    border-radius: 999px;
+    border: 1px solid var(--panel-border);
+  }
+
+  .toolbar {
+    max-width: 520px;
+    margin: 0 auto 24px;
+    display: flex;
+    gap: 8px;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+
+  .filter-btn {
+    border: 1px solid var(--panel-border);
+    background: rgba(255,255,255,0.04);
+    color: var(--text-dim);
+    padding: 8px 16px;
+    border-radius: 999px;
+    font-size: 13px;
+    cursor: pointer;
+    transition: all .2s;
+  }
+  .filter-btn:hover { color: var(--text); }
+  .filter-btn.active {
+    background: rgba(255,255,255,0.12);
+    color: var(--text);
+    border-color: rgba(255,255,255,0.2);
+  }
+
+  /* Group (sub-category) */
+  .group {
+    margin-top: 14px;
+    border-left: 2px solid rgba(255,255,255,0.08);
+    padding-left: 12px;
+    animation: pop .25s ease;
+  }
+  .column.work .group { border-left-color: rgba(99,102,241,0.4); }
+  .column.personal .group { border-left-color: rgba(14,165,233,0.4); }
+
+  .group-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 6px 0 8px;
+  }
+
+  .group-toggle {
+    background: transparent;
+    border: none;
+    color: var(--text-dim);
+    cursor: pointer;
+    font-size: 12px;
+    width: 20px;
+    height: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 6px;
+    transition: transform .2s, background .2s, color .2s;
+  }
+  .group-toggle:hover { background: rgba(255,255,255,0.08); color: var(--text); }
+  .group.collapsed .group-toggle { transform: rotate(-90deg); }
+  .group.collapsed > .group-body { display: none; }
+
+  .group-name {
+    flex: 1;
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--text);
+    background: transparent;
+    border: none;
+    outline: none;
+    padding: 4px 6px;
+    border-radius: 6px;
+    transition: background .2s;
+  }
+  .group-name:hover { background: rgba(255,255,255,0.05); }
+  .group-name:focus { background: rgba(255,255,255,0.08); }
+
+  .group-count {
+    font-size: 12px;
+    color: var(--text-dim);
+  }
+
+  .icon-btn {
+    background: transparent;
+    border: none;
+    color: var(--text-dim);
+    cursor: pointer;
+    font-size: 15px;
+    width: 26px; height: 26px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 7px;
+    transition: color .2s, background .2s;
+    flex-shrink: 0;
+  }
+  .icon-btn:hover { background: rgba(255,255,255,0.08); color: var(--text); }
+  .icon-btn.add:hover { color: #22c55e; }
+  .icon-btn.del-group:hover { color: var(--danger); background: rgba(239,68,68,0.12); }
+  .icon-btn.hide:hover { color: #fbbf24; background: rgba(251,191,36,0.12); }
+
+  .column.hidden .col-hide,
+  .column.hidden .add-row,
+  .column.hidden .list,
+  .column.hidden .group,
+  .column.hidden .add-group-btn { display: none; }
+
+  .column.hidden .col-restore {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 10px;
+    padding: 14px;
+    border: 1px dashed var(--panel-border);
+    border-radius: 12px;
+    color: var(--text-dim);
+    cursor: pointer;
+    background: transparent;
+    width: 100%;
+    font-size: 14px;
+    transition: color .2s, border-color .2s, background .2s;
+  }
+  .column.hidden .col-restore:hover { color: var(--text); border-color: rgba(255,255,255,0.25); background: rgba(255,255,255,0.03); }
+  .col-restore { display: none; }
+
+  .group-body { padding-left: 2px; }
+
+  .add-row {
+    display: flex;
+    gap: 8px;
+    margin-top: 10px;
+  }
+
+  .add-row input {
+    flex: 1;
+    background: rgba(0,0,0,0.25);
+    border: 1px solid var(--panel-border);
+    border-radius: 12px;
+    padding: 10px 14px;
+    color: var(--text);
+    font-size: 14px;
+    outline: none;
+    transition: border-color .2s, box-shadow .2s;
+  }
+  .add-row input:focus {
+    border-color: rgba(255,255,255,0.25);
+    box-shadow: 0 0 0 3px rgba(255,255,255,0.05);
+  }
+  .add-row input::placeholder { color: var(--text-dim); }
+
+  .mini-btn {
+    border: none;
+    border-radius: 12px;
+    padding: 0 14px;
+    height: 40px;
+    font-size: 14px;
+    color: #fff;
+    cursor: pointer;
+    font-weight: 600;
+    transition: transform .12s, filter .2s;
+    flex-shrink: 0;
+  }
+  .mini-btn:active { transform: scale(0.94); }
+  .mini-btn:hover { filter: brightness(1.1); }
+  .column.work .mini-btn { background: linear-gradient(135deg, var(--work-accent), var(--work-accent-2)); }
+  .column.personal .mini-btn { background: linear-gradient(135deg, var(--personal-accent), var(--personal-accent-2)); }
+
+  .add-group-btn {
+    margin-top: 14px;
+    width: 100%;
+    border: 1px dashed var(--panel-border);
+    background: transparent;
+    color: var(--text-dim);
+    padding: 10px;
+    border-radius: 12px;
+    font-size: 14px;
+    cursor: pointer;
+    transition: color .2s, border-color .2s, background .2s;
+  }
+  .add-group-btn:hover { color: var(--text); border-color: rgba(255,255,255,0.25); background: rgba(255,255,255,0.03); }
+
+  .list {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 4px;
+  }
+
+  .empty {
+    text-align: center;
+    color: var(--text-dim);
+    font-size: 13px;
+    padding: 14px 6px;
+    opacity: 0.6;
+  }
+
+  .item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid var(--panel-border);
+    border-radius: 12px;
+    padding: 10px 12px;
+    transition: background .2s, opacity .3s, transform .3s;
+    animation: pop .25s ease;
+  }
+
+  @keyframes pop {
+    from { opacity: 0; transform: translateY(-6px) scale(0.98); }
+    to { opacity: 1; transform: none; }
+  }
+
+  .item:hover { background: rgba(255,255,255,0.07); }
+  .item.removing { opacity: 0; transform: translateX(40px); }
+
+  .checkbox {
+    width: 22px; height: 22px;
+    border-radius: 7px;
+    border: 2px solid rgba(255,255,255,0.25);
+    cursor: pointer;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background .2s, border-color .2s;
+  }
+
+  .checkbox svg { width: 13px; height: 13px; opacity: 0; transition: opacity .15s; }
+
+  .item.done .checkbox { border-color: transparent; }
+  .column.work .item.done .checkbox { background: linear-gradient(135deg, var(--work-accent), var(--work-accent-2)); }
+  .column.personal .item.done .checkbox { background: linear-gradient(135deg, var(--personal-accent), var(--personal-accent-2)); }
+  .item.done .checkbox svg { opacity: 1; }
+
+  .item-text {
+    flex: 1;
+    font-size: 14.5px;
+    line-height: 1.35;
+    word-break: break-word;
+    background: transparent;
+    border: none;
+    outline: none;
+    color: var(--text);
+    transition: color .25s, text-decoration-color .25s;
+    padding: 2px 4px;
+    border-radius: 6px;
+  }
+  .item-text:hover { background: rgba(255,255,255,0.04); }
+
+  .item.done .item-text {
+    text-decoration: line-through;
+    color: var(--text-dim);
+  }
+
+  .due-wrap {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex-shrink: 0;
+  }
+
+  .due-input {
+    background: transparent;
+    border: 1px solid transparent;
+    color: var(--text-dim);
+    font-size: 12px;
+    padding: 4px 6px;
+    border-radius: 6px;
+    cursor: pointer;
+    outline: none;
+    width: 118px;
+    transition: border-color .2s, background .2s;
+    color-scheme: dark;
+  }
+  .due-input:hover { background: rgba(255,255,255,0.05); border-color: var(--panel-border); }
+  .due-input:focus { border-color: rgba(255,255,255,0.2); background: rgba(0,0,0,0.2); }
+
+  .due-badge {
+    font-size: 11px;
+    padding: 3px 8px;
+    border-radius: 999px;
+    font-weight: 600;
+    white-space: nowrap;
+    cursor: pointer;
+    border: 1px solid transparent;
+  }
+  .due-badge.overdue {
+    background: rgba(239,68,68,0.15);
+    color: #fca5a5;
+    border-color: rgba(239,68,68,0.3);
+  }
+  .due-badge.today {
+    background: rgba(245,158,11,0.15);
+    color: #fcd34d;
+    border-color: rgba(245,158,11,0.3);
+  }
+  .due-badge.soon {
+    background: rgba(59,130,246,0.12);
+    color: #93c5fd;
+    border-color: rgba(59,130,246,0.25);
+  }
+  .due-badge.future {
+    background: rgba(255,255,255,0.05);
+    color: var(--text-dim);
+    border-color: var(--panel-border);
+  }
+
+  .item.overdue:not(.done) {
+    border-color: rgba(239,68,68,0.35);
+    background: rgba(239,68,68,0.05);
+  }
+
+  .overdue-banner {
+    max-width: 1100px;
+    margin: 0 auto 20px;
+    background: rgba(239,68,68,0.1);
+    border: 1px solid rgba(239,68,68,0.3);
+    border-radius: 16px;
+    padding: 14px 18px;
+    display: none;
+    align-items: center;
+    gap: 10px;
+    font-size: 14px;
+  }
+  .overdue-banner.show { display: flex; }
+  .overdue-banner .ov-count {
+    font-weight: 700;
+    color: #fca5a5;
+  }
+  .overdue-banner .ov-link {
+    margin-left: auto;
+    background: rgba(239,68,68,0.2);
+    border: none;
+    color: #fff;
+    padding: 6px 14px;
+    border-radius: 999px;
+    font-size: 13px;
+    cursor: pointer;
+    font-weight: 600;
+  }
+  .overdue-banner .ov-link:hover { background: rgba(239,68,68,0.3); }
+
+  .del {
+    border: none;
+    background: transparent;
+    color: var(--text-dim);
+    cursor: pointer;
+    font-size: 17px;
+    line-height: 1;
+    padding: 5px;
+    border-radius: 7px;
+    transition: color .2s, background .2s;
+    flex-shrink: 0;
+  }
+  .del:hover { color: var(--danger); background: rgba(239,68,68,0.1); }
+
+  .root-add {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <h1>Arjun's Day Tasks</h1>
+    <div class="date" id="dateLabel"></div>
+    <div class="progress-wrap">
+      <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
+      <div class="progress-label" id="progressLabel">0 of 0 done</div>
+    </div>
+  </header>
+
+  <div class="overdue-banner" id="overdueBanner">
+    <span class="ov-count" id="overdueCount">0</span>
+    <span id="overdueText">overdue tasks</span>
+    <button class="ov-link" id="overdueFilter">Show only overdue</button>
+  </div>
+
+  <div class="toolbar">
+    <button class="filter-btn active" data-filter="all">All</button>
+    <button class="filter-btn" data-filter="active">Active</button>
+    <button class="filter-btn" data-filter="done">Completed</button>
+    <button class="filter-btn" data-filter="overdue">Overdue</button>
+    <button class="filter-btn" data-filter="collapse">Collapse all</button>
+    <button class="filter-btn" data-filter="clear">Clear completed</button>
+  </div>
+
+  <div class="columns">
+    <section class="column work" id="col-work">
+      <div class="col-head">
+        <div class="col-title"><span class="dot work"></span> Work</div>
+        <span class="count" id="count-work">0</span>
+        <button class="icon-btn hide" id="hide-work" title="Hide Work panel" style="margin-left:auto;">&#128065;</button>
+      </div>
+      <button class="col-restore" id="restore-work">&#128065; Show Work panel</button>
+    </section>
+
+    <section class="column personal" id="col-personal">
+      <div class="col-head">
+        <div class="col-title"><span class="dot personal"></span> Personal</div>
+        <span class="count" id="count-personal">0</span>
+        <button class="icon-btn hide" id="hide-personal" title="Hide Personal panel" style="margin-left:auto;">&#128065;</button>
+      </div>
+      <button class="col-restore" id="restore-personal">&#128065; Show Personal panel</button>
+    </section>
+  </div>
+</div>
+
+<script>
+  const STORAGE_KEY = "todo.arjun.v2";
+  let filter = "all";
+
+  // Tree state: each root has tasks[] and children[] (groups). Each group same shape.
+  let state = {
+    work: { tasks: [], children: [], collapsed: false },
+    personal: { tasks: [], children: [], collapsed: false }
+  };
+
+  let hiddenPanels = { work: false, personal: false };
+
+  function load() {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed && parsed.work && parsed.personal) state = parsed;
+      }
+      const hidden = localStorage.getItem(STORAGE_KEY + ".hidden");
+      if (hidden) hiddenPanels = JSON.parse(hidden);
+    } catch (e) {}
+    // ensure shape
+    for (const k of ["work","personal"]) {
+      if (!state[k]) state[k] = { tasks: [], children: [], collapsed: false };
+      normalizeNode(state[k]);
+    }
+  }
+  function normalizeNode(n) {
+    if (!Array.isArray(n.tasks)) n.tasks = [];
+    if (!Array.isArray(n.children)) n.children = [];
+    if (typeof n.collapsed !== "boolean") n.collapsed = false;
+    n.tasks.forEach(t => { if (!t.due) t.due = null; });
+    n.children.forEach(normalizeNode);
+  }
+  function save() {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    localStorage.setItem(STORAGE_KEY + ".hidden", JSON.stringify(hiddenPanels));
+  }
+  function uid() {
+    return Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+  }
+
+  const checkSvg = '<svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>';
+
+  function findNode(cat, id) {
+    if (id === null) return state[cat];
+    function search(node) {
+      for (const c of node.children) {
+        if (c.id === id) return c;
+        const r = search(c);
+        if (r) return r;
+      }
+      return null;
+    }
+    return search(state[cat]);
+  }
+
+  function addTask(cat, parentId, text) {
+    text = text.trim();
+    if (!text) return;
+    const node = findNode(cat, parentId);
+    if (!node) return;
+    node.tasks.push({ id: uid(), text, done: false, due: null });
+    save(); render();
+  }
+
+  function toggleTask(cat, taskId) {
+    function walk(node) {
+      const t = node.tasks.find(t => t.id === taskId);
+      if (t) { t.done = !t.done; return true; }
+      return node.children.some(walk);
+    }
+    walk(state[cat]);
+    save(); render();
+  }
+
+  function deleteTask(cat, taskId) {
+    const el = document.querySelector(`[data-taskid="${taskId}"]`);
+    const doRemove = () => {
+      function walk(node) {
+        const i = node.tasks.findIndex(t => t.id === taskId);
+        if (i >= 0) { node.tasks.splice(i, 1); return true; }
+        return node.children.some(walk);
+      }
+      walk(state[cat]);
+      save(); render();
+    };
+    if (el) { el.classList.add("removing"); setTimeout(doRemove, 220); }
+    else doRemove();
+  }
+
+  function renameTask(cat, taskId, val) {
+    val = val.trim();
+    function walk(node) {
+      const t = node.tasks.find(t => t.id === taskId);
+      if (t) { t.text = val || t.text; return true; }
+      return node.children.some(walk);
+    }
+    walk(state[cat]);
+    save();
+  }
+
+  function setDueDate(cat, taskId, dateStr) {
+    function walk(node) {
+      const t = node.tasks.find(t => t.id === taskId);
+      if (t) { t.due = dateStr || null; return true; }
+      return node.children.some(walk);
+    }
+    walk(state[cat]);
+    save(); render();
+  }
+
+  function parseDate(str) {
+    if (!str) return null;
+    const d = new Date(str + "T00:00:00");
+    return isNaN(d) ? null : d;
+  }
+
+  function isOverdue(t) {
+    if (t.done || !t.due) return false;
+    const d = parseDate(t.due);
+    if (!d) return false;
+    const today = new Date();
+    today.setHours(0,0,0,0);
+    return d < today;
+  }
+
+  function isToday(t) {
+    if (!t.due) return false;
+    const d = parseDate(t.due);
+    if (!d) return false;
+    const today = new Date();
+    today.setHours(0,0,0,0);
+    return d.getTime() === today.getTime();
+  }
+
+  function daysUntil(t) {
+    if (!t.due) return null;
+    const d = parseDate(t.due);
+    if (!d) return null;
+    const today = new Date();
+    today.setHours(0,0,0,0);
+    return Math.round((d - today) / 86400000);
+  }
+
+  function formatDateShort(str) {
+    const d = parseDate(str);
+    if (!d) return "";
+    return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+  }
+
+  function dueBadgeClass(t) {
+    if (!t.due) return "";
+    const days = daysUntil(t);
+    if (days < 0) return "overdue";
+    if (days === 0) return "today";
+    if (days <= 3) return "soon";
+    return "future";
+  }
+
+  function addGroup(cat, parentId, name) {
+    name = (name || "").trim();
+    if (!name) name = "New Group";
+    const node = findNode(cat, parentId);
+    if (!node) return;
+    node.children.push({ id: uid(), name, tasks: [], children: [], collapsed: false });
+    save(); render();
+  }
+
+  function renameGroup(cat, groupId, name) {
+    const node = findNode(cat, groupId);
+    if (node) node.name = name;
+    save();
+  }
+
+  function deleteGroup(cat, groupId) {
+    const el = document.querySelector(`[data-groupid="${groupId}"]`);
+    const doRemove = () => {
+      function walk(node) {
+        const i = node.children.findIndex(c => c.id === groupId);
+        if (i >= 0) { node.children.splice(i, 1); return true; }
+        return node.children.some(walk);
+      }
+      walk(state[cat]);
+      save(); render();
+    };
+    if (el) {
+      el.style.transition = "opacity .25s, transform .25s";
+      el.style.opacity = "0";
+      el.style.transform = "translateX(40px)";
+      setTimeout(doRemove, 250);
+    } else doRemove();
+  }
+
+  function toggleCollapse(cat, groupId) {
+    const node = findNode(cat, groupId);
+    if (node) { node.collapsed = !node.collapsed; save(); render(); }
+  }
+
+  function matchesFilter(t) {
+    if (filter === "active") return !t.done;
+    if (filter === "done") return t.done;
+    if (filter === "overdue") return isOverdue(t);
+    return true;
+  }
+
+  // Count tasks in a node (including descendants)
+  function countTasks(node) {
+    let n = node.tasks.length;
+    node.children.forEach(c => n += countTasks(c));
+    return n;
+  }
+
+  function countAll(cat) {
+    return countTasks(state[cat]);
+  }
+
+  function renderItem(cat, t) {
+    const li = document.createElement("li");
+    li.className = "item" + (t.done ? " done" : "") + (isOverdue(t) ? " overdue" : "");
+    li.dataset.taskid = t.id;
+
+    const cb = document.createElement("div");
+    cb.className = "checkbox";
+    cb.innerHTML = checkSvg;
+    cb.addEventListener("click", () => toggleTask(cat, t.id));
+
+    const span = document.createElement("input");
+    span.className = "item-text";
+    span.value = t.text;
+    span.addEventListener("blur", () => renameTask(cat, t.id, span.value));
+    span.addEventListener("keydown", e => {
+      if (e.key === "Enter") { span.blur(); }
+    });
+
+    const dueWrap = document.createElement("div");
+    dueWrap.className = "due-wrap";
+
+    const dueBadge = document.createElement("span");
+    dueBadge.className = "due-badge " + dueBadgeClass(t);
+    let badgeText = "+ date";
+    if (t.due) {
+      const days = daysUntil(t);
+      badgeText = formatDateShort(t.due);
+      if (days < 0 && !t.done) badgeText = "⚠ " + formatDateShort(t.due);
+    }
+    dueBadge.textContent = badgeText;
+    dueBadge.title = t.due ? `Due ${formatDateShort(t.due)}` : "Set due date";
+    dueBadge.addEventListener("click", () => {
+      dueInput.style.display = "block";
+      dueBadge.style.display = "none";
+      dueInput.showPicker ? dueInput.showPicker() : dueInput.focus();
+    });
+
+    const dueInput = document.createElement("input");
+    dueInput.type = "date";
+    dueInput.className = "due-input";
+    dueInput.value = t.due || "";
+    dueInput.style.display = "none";
+    dueInput.addEventListener("change", () => {
+      setDueDate(cat, t.id, dueInput.value);
+    });
+    dueInput.addEventListener("blur", () => {
+      dueInput.style.display = "none";
+      dueBadge.style.display = "";
+    });
+
+    dueWrap.append(dueBadge, dueInput);
+
+    const del = document.createElement("button");
+    del.className = "del";
+    del.innerHTML = "&times;";
+    del.setAttribute("aria-label", "Delete task");
+    del.addEventListener("click", () => deleteTask(cat, t.id));
+
+    li.append(cb, span, dueWrap, del);
+    return li;
+  }
+
+  function renderAddRow(cat, parentId, placeholder, onSubmit) {
+    const form = document.createElement("form");
+    form.className = "add-row";
+    const input = document.createElement("input");
+    input.type = "text";
+    input.placeholder = placeholder;
+    input.maxLength = 200;
+    input.autocomplete = "off";
+    const btn = document.createElement("button");
+    btn.className = "mini-btn";
+    btn.type = "submit";
+    btn.textContent = "Add";
+    form.append(input, btn);
+    form.addEventListener("submit", e => {
+      e.preventDefault();
+      onSubmit(input.value);
+      input.value = "";
+      input.focus();
+    });
+    return form;
+  }
+
+  function renderGroup(cat, node) {
+    const wrap = document.createElement("div");
+    wrap.className = "group" + (node.collapsed ? " collapsed" : "");
+    wrap.dataset.groupid = node.id;
+
+    const head = document.createElement("div");
+    head.className = "group-head";
+
+    const toggle = document.createElement("button");
+    toggle.className = "group-toggle";
+    toggle.innerHTML = "&#9660;";
+    toggle.title = "Collapse / expand";
+    toggle.addEventListener("click", () => toggleCollapse(cat, node.id));
+
+    const name = document.createElement("input");
+    name.className = "group-name";
+    name.value = node.name || "Untitled";
+    name.addEventListener("blur", () => renameGroup(cat, node.id, name.value));
+    name.addEventListener("keydown", e => {
+      if (e.key === "Enter") name.blur();
+    });
+
+    const cnt = document.createElement("span");
+    cnt.className = "group-count";
+    cnt.textContent = countTasks(node);
+
+    const addTaskBtn = document.createElement("button");
+    addTaskBtn.className = "icon-btn add";
+    addTaskBtn.innerHTML = "+";
+    addTaskBtn.title = "Add task to this group";
+    addTaskBtn.addEventListener("click", () => {
+      const row = renderAddRow(cat, node.id, "Add a task…", v => addTask(cat, node.id, v));
+      body.insertBefore(row, body.firstChild);
+      row.querySelector("input").focus();
+    });
+
+    const addGroupBtn = document.createElement("button");
+    addGroupBtn.className = "icon-btn add";
+    addGroupBtn.innerHTML = "&#8862;"; // square plus
+    addGroupBtn.title = "Add sub-group inside this";
+    addGroupBtn.addEventListener("click", () => {
+      const row = renderAddRow(cat, node.id, "New sub-group name…", v => addGroup(cat, node.id, v));
+      body.appendChild(row);
+      row.querySelector("input").focus();
+    });
+
+    const delGroup = document.createElement("button");
+    delGroup.className = "icon-btn del-group";
+    delGroup.innerHTML = "&times;";
+    delGroup.title = "Delete group (and its contents)";
+    delGroup.addEventListener("click", () => {
+      if (confirm(`Delete group "${node.name}" and everything inside it?`)) {
+        deleteGroup(cat, node.id);
+      }
+    });
+
+    head.append(toggle, name, cnt, addTaskBtn, addGroupBtn, delGroup);
+
+    const body = document.createElement("div");
+    body.className = "group-body";
+
+    // Task list
+    const ul = document.createElement("ul");
+    ul.className = "list";
+    const visibleTasks = node.tasks.filter(matchesFilter);
+    if (visibleTasks.length === 0) {
+      const empty = document.createElement("div");
+      empty.className = "empty";
+      empty.textContent = node.tasks.length === 0
+        ? "No tasks yet. Tap + to add one."
+        : (filter === "done" ? "No completed tasks here." : "Nothing active here.");
+      ul.appendChild(empty);
+    } else {
+      visibleTasks.forEach(t => ul.appendChild(renderItem(cat, t)));
+    }
+    body.appendChild(ul);
+
+    // Sub-groups (recursive)
+    node.children.forEach(child => body.appendChild(renderGroup(cat, child)));
+
+    wrap.append(head, body);
+    return wrap;
+  }
+
+  function renderColumn(cat) {
+    const col = document.getElementById("col-" + cat);
+    // Apply hidden state
+    col.classList.toggle("hidden", !!hiddenPanels[cat]);
+    // Remove everything except the header and restore button
+    const header = col.querySelector(".col-head");
+    col.innerHTML = "";
+    col.appendChild(header);
+
+    const root = state[cat];
+
+    // Root task add row
+    const addTaskRow = renderAddRow(cat, null, `Add a ${cat} task…`, v => addTask(cat, null, v));
+    col.appendChild(addTaskRow);
+
+    // Root tasks
+    const ul = document.createElement("ul");
+    ul.className = "list";
+    const visible = root.tasks.filter(matchesFilter);
+    if (visible.length === 0) {
+      const empty = document.createElement("div");
+      empty.className = "empty";
+      empty.textContent = root.tasks.length === 0
+        ? "No tasks yet. Add one above."
+        : (filter === "done" ? "No completed tasks." : "Nothing active.");
+      ul.appendChild(empty);
+    } else {
+      visible.forEach(t => ul.appendChild(renderItem(cat, t)));
+    }
+    col.appendChild(ul);
+
+    // Sub-groups
+    root.children.forEach(g => col.appendChild(renderGroup(cat, g)));
+
+    // Add group button (root level)
+    const addGroupBtn = document.createElement("button");
+    addGroupBtn.className = "add-group-btn";
+    addGroupBtn.textContent = "+ Add group";
+    addGroupBtn.addEventListener("click", () => {
+      const row = renderAddRow(cat, null, "New group name…", v => addGroup(cat, null, v));
+      col.appendChild(row);
+      row.querySelector("input").focus();
+    });
+    col.appendChild(addGroupBtn);
+
+    document.getElementById("count-" + cat).textContent = countAll(cat);
+  }
+
+  function renderProgress() {
+    function collect(node, all) {
+      node.tasks.forEach(t => all.push(t));
+      node.children.forEach(c => collect(c, all));
+    }
+    const all = [];
+    collect(state.work, all);
+    collect(state.personal, all);
+    const done = all.filter(t => t.done).length;
+    const pct = all.length ? (done / all.length) * 100 : 0;
+    document.getElementById("progressFill").style.width = pct + "%";
+    document.getElementById("progressLabel").textContent = `${done} of ${all.length} done`;
+
+    // Overdue banner
+    const overdue = all.filter(isOverdue);
+    const banner = document.getElementById("overdueBanner");
+    if (overdue.length > 0) {
+      banner.classList.add("show");
+      document.getElementById("overdueCount").textContent = overdue.length;
+      document.getElementById("overdueText").textContent =
+        overdue.length === 1 ? "overdue task needs attention" : "overdue tasks need attention";
+    } else {
+      banner.classList.remove("show");
+    }
+  }
+
+  function render() {
+    renderColumn("work");
+    renderColumn("personal");
+    renderProgress();
+  }
+
+  function collapseAll() {
+    function walk(node) {
+      node.collapsed = true;
+      node.children.forEach(walk);
+    }
+    walk(state.work);
+    walk(state.personal);
+    save(); render();
+  }
+
+  function clearCompleted() {
+    function walk(node) {
+      node.tasks = node.tasks.filter(t => !t.done);
+      node.children.forEach(walk);
+    }
+    walk(state.work);
+    walk(state.personal);
+    save(); render();
+  }
+
+  // Filters
+  document.querySelectorAll(".filter-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const f = btn.dataset.filter;
+      if (f === "clear") { clearCompleted(); return; }
+      if (f === "collapse") { collapseAll(); return; }
+      filter = f;
+      document.querySelectorAll(".filter-btn").forEach(b => {
+        if (b.dataset.filter !== "clear" && b.dataset.filter !== "collapse") {
+          b.classList.toggle("active", b === btn);
+        }
+      });
+      render();
+    });
+  });
+
+  // Overdue banner button
+  document.getElementById("overdueFilter").addEventListener("click", () => {
+    filter = "overdue";
+    document.querySelectorAll(".filter-btn").forEach(b => {
+      if (b.dataset.filter !== "clear" && b.dataset.filter !== "collapse") {
+        b.classList.toggle("active", b.dataset.filter === "overdue");
+      }
+    });
+    render();
+  });
+
+  // Hide / restore panels
+  ["work", "personal"].forEach(cat => {
+    document.getElementById("hide-" + cat).addEventListener("click", () => {
+      hiddenPanels[cat] = true;
+      save();
+      render();
+    });
+    document.getElementById("restore-" + cat).addEventListener("click", () => {
+      hiddenPanels[cat] = false;
+      save();
+      render();
+    });
+  });
+
+  const now = new Date();
+  document.getElementById("dateLabel").textContent =
+    now.toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" });
+
+  load();
+  render();
+</script>
+</body>
+</html>
