@@ -23,6 +23,7 @@
 
   html, body {
     min-height: 100%;
+    overflow-x: hidden;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
     color: var(--text);
     background: linear-gradient(135deg, #1e1b4b 0%, #0f172a 50%, #1e293b 100%);
@@ -115,6 +116,7 @@
     box-shadow: 0 20px 50px rgba(0,0,0,0.25);
     position: relative;
     overflow: hidden;
+    min-width: 0;
   }
 
   .column.work::before,
@@ -287,10 +289,12 @@
     display: flex;
     gap: 8px;
     margin-top: 10px;
+    flex-wrap: wrap;
   }
 
   .add-row input {
-    flex: 1;
+    flex: 1 1 120px;
+    min-width: 0;
     background: rgba(0,0,0,0.25);
     border: 1px solid var(--panel-border);
     border-radius: 12px;
@@ -355,7 +359,7 @@
 
   .item {
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     gap: 10px;
     background: rgba(255,255,255,0.04);
     border: 1px solid var(--panel-border);
@@ -363,6 +367,29 @@
     padding: 10px 12px;
     transition: background .2s, opacity .3s, transform .3s;
     animation: pop .25s ease;
+    flex-wrap: wrap;
+  }
+
+  .item-main {
+    flex: 1 1 140px;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+  }
+
+  .item-actions {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex-shrink: 0;
+    flex-wrap: wrap;
+  }
+
+  .created-date {
+    font-size: 11px;
+    color: var(--text-dim);
+    opacity: 0.7;
   }
 
   @keyframes pop {
@@ -393,10 +420,12 @@
   .item.done .checkbox svg { opacity: 1; }
 
   .item-text {
-    flex: 1;
+    font-family: inherit;
     font-size: 14.5px;
     line-height: 1.35;
     word-break: break-word;
+    overflow-wrap: break-word;
+    white-space: pre-wrap;
     background: transparent;
     border: none;
     outline: none;
@@ -404,6 +433,10 @@
     transition: color .25s, text-decoration-color .25s;
     padding: 2px 4px;
     border-radius: 6px;
+    resize: none;
+    width: 100%;
+    field-sizing: content;
+    min-height: 24px;
   }
   .item-text:hover { background: rgba(255,255,255,0.04); }
 
@@ -428,7 +461,7 @@
     border-radius: 6px;
     cursor: pointer;
     outline: none;
-    width: 175px;
+    max-width: 100%;
     transition: border-color .2s, background .2s;
     color-scheme: dark;
   }
@@ -722,7 +755,7 @@
     if (!Array.isArray(n.tasks)) n.tasks = [];
     if (!Array.isArray(n.children)) n.children = [];
     if (typeof n.collapsed !== "boolean") n.collapsed = false;
-    n.tasks.forEach(t => { if (!t.due) t.due = null; });
+    n.tasks.forEach(t => { if (!t.due) t.due = null; if (!t.created) t.created = null; });
     n.children.forEach(normalizeNode);
   }
 
@@ -780,7 +813,7 @@
     if (!text) return;
     const node = findNode(cat, parentId);
     if (!node) return;
-    node.tasks.push({ id: uid(), text, done: false, due: null });
+    node.tasks.push({ id: uid(), text, done: false, due: null, created: new Date().toISOString() });
     save(); render();
   }
 
@@ -977,6 +1010,14 @@
     return countTasks(state[cat]);
   }
 
+  function formatCreatedDate(str) {
+    if (!str) return "";
+    const d = new Date(str);
+    if (isNaN(d)) return "";
+    return "Created " + d.toLocaleDateString(undefined, { month: "short", day: "numeric" }) +
+           " " + d.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+  }
+
   function renderItem(cat, t, parentId) {
     const li = document.createElement("li");
     li.className = "item" + (t.done ? " done" : "") + (isOverdue(t) ? " overdue" : "");
@@ -987,27 +1028,44 @@
     cb.innerHTML = checkSvg;
     cb.addEventListener("click", () => toggleTask(cat, t.id));
 
-    const span = document.createElement("input");
+    const main = document.createElement("div");
+    main.className = "item-main";
+
+    const span = document.createElement("textarea");
     span.className = "item-text";
     span.value = t.text;
+    span.rows = 1;
+    span.addEventListener("input", () => {
+      span.style.height = "auto";
+      span.style.height = span.scrollHeight + "px";
+    });
     span.addEventListener("blur", () => renameTask(cat, t.id, span.value));
     span.addEventListener("keydown", e => {
-      if (e.key === "Enter") { span.blur(); }
+      if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); span.blur(); }
     });
+
+    const createdLabel = document.createElement("span");
+    createdLabel.className = "created-date";
+    createdLabel.textContent = formatCreatedDate(t.created);
+
+    main.append(span, createdLabel);
+
+    const actions = document.createElement("div");
+    actions.className = "item-actions";
 
     const dueWrap = document.createElement("div");
     dueWrap.className = "due-wrap";
 
     const dueBadge = document.createElement("span");
     dueBadge.className = "due-badge " + dueBadgeClass(t);
-    let badgeText = "+ date/time";
+    let badgeText = "+ deadline";
     if (t.due) {
       const days = daysUntil(t);
       badgeText = formatDateShort(t.due);
       if (days < 0 && !t.done) badgeText = "⚠ " + formatDateShort(t.due);
     }
     dueBadge.textContent = badgeText;
-    dueBadge.title = t.due ? `Due ${formatDateShort(t.due)}` : "Set due date & time";
+    dueBadge.title = t.due ? `Deadline: ${formatDateShort(t.due)}` : "Set deadline date & time";
     dueBadge.addEventListener("click", () => {
       dueInput.style.display = "block";
       dueBadge.style.display = "none";
@@ -1063,7 +1121,7 @@
       document.body.appendChild(menu);
       const rect = moveBtn.getBoundingClientRect();
       menu.style.top = (rect.bottom + window.scrollY + 4) + "px";
-      menu.style.left = (rect.right - 160 + window.scrollX) + "px";
+      menu.style.left = Math.max(8, rect.right - 160 + window.scrollX) + "px";
       const closeHandler = ev => {
         if (!menu.contains(ev.target)) { menu.remove(); document.removeEventListener("click", closeHandler); }
       };
@@ -1076,7 +1134,9 @@
     del.setAttribute("aria-label", "Delete task");
     del.addEventListener("click", () => deleteTask(cat, t.id));
 
-    li.append(cb, span, dueWrap, moveBtn, del);
+    actions.append(dueWrap, moveBtn, del);
+    li.append(cb, main, actions);
+    setTimeout(() => { span.style.height = "auto"; span.style.height = span.scrollHeight + "px"; }, 0);
     return li;
   }
 
