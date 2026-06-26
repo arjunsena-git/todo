@@ -57,6 +57,16 @@
     margin-top: 6px;
   }
 
+  .sync-status {
+    font-size: 12px;
+    color: var(--text-dim);
+    margin-top: 4px;
+    min-height: 16px;
+  }
+  .sync-status.syncing { color: #fcd34d; }
+  .sync-status.synced { color: #4ade80; }
+  .sync-status.error { color: var(--danger); }
+
   .progress-wrap {
     max-width: 480px;
     margin: 18px auto 0;
@@ -516,6 +526,7 @@
   <header>
     <h1>Arjun's Day Tasks</h1>
     <div class="date" id="dateLabel"></div>
+    <div class="sync-status" id="syncStatus"></div>
     <div class="progress-wrap">
       <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
       <div class="progress-label" id="progressLabel">0 of 0 done</div>
@@ -560,7 +571,11 @@
 
 <script>
   const STORAGE_KEY = "todo.arjun.v2";
+  const JSONBIN_BIN_ID = "6a3df970f5f4af5e29325638";
+  const JSONBIN_API_KEY = "$2a$10$WB1BcnQ4xOx2n6fYxHUJUOV5pGhJfM0rHU6wtgCQz5HfmQroTlvZK";
+  const JSONBIN_URL = `https://api.jsonbin.io/v3/b/${JSONBIN_BIN_ID}`;
   let filter = "all";
+  let syncTimer = null;
 
   // Tree state: each root has tasks[] and children[] (groups). Each group same shape.
   let state = {
@@ -570,7 +585,7 @@
 
   let hiddenPanels = { work: false, personal: false };
 
-  function load() {
+  function loadLocal() {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
       if (raw) {
@@ -586,6 +601,37 @@
       normalizeNode(state[k]);
     }
   }
+
+  async function loadRemote() {
+    setSyncStatus("Syncing…", "syncing");
+    try {
+      const res = await fetch(JSONBIN_URL + "/latest", {
+        headers: { "X-Master-Key": JSONBIN_API_KEY }
+      });
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      const data = await res.json();
+      const remote = data.record;
+      if (remote && remote.work && remote.personal) {
+        state = remote;
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+        normalizeNode(state.work);
+        normalizeNode(state.personal);
+        setSyncStatus("Synced from cloud", "synced");
+        render();
+      } else {
+        setSyncStatus("Cloud empty, using local", "synced");
+      }
+    } catch (e) {
+      setSyncStatus("Offline — using local data", "error");
+    }
+  }
+
+  function setSyncStatus(msg, cls) {
+    const el = document.getElementById("syncStatus");
+    el.textContent = msg;
+    el.className = "sync-status" + (cls ? " " + cls : "");
+  }
+
   function normalizeNode(n) {
     if (!Array.isArray(n.tasks)) n.tasks = [];
     if (!Array.isArray(n.children)) n.children = [];
@@ -593,9 +639,36 @@
     n.tasks.forEach(t => { if (!t.due) t.due = null; });
     n.children.forEach(normalizeNode);
   }
-  function save() {
+
+  function saveLocal() {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
     localStorage.setItem(STORAGE_KEY + ".hidden", JSON.stringify(hiddenPanels));
+  }
+
+  function saveRemote() {
+    clearTimeout(syncTimer);
+    syncTimer = setTimeout(async () => {
+      setSyncStatus("Syncing…", "syncing");
+      try {
+        const res = await fetch(JSONBIN_URL, {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+            "X-Master-Key": JSONBIN_API_KEY
+          },
+          body: JSON.stringify(state)
+        });
+        if (!res.ok) throw new Error("HTTP " + res.status);
+        setSyncStatus("Synced to cloud", "synced");
+      } catch (e) {
+        setSyncStatus("Save failed — changes saved locally", "error");
+      }
+    }, 800);
+  }
+
+  function save() {
+    saveLocal();
+    saveRemote();
   }
   function uid() {
     return Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
@@ -1089,8 +1162,15 @@
   document.getElementById("dateLabel").textContent =
     now.toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" });
 
-  load();
+  loadLocal();
   render();
+  loadRemote();
+
+  // Poll for changes from other devices every 30 seconds
+  setInterval(loadRemote, 30000);
+
+  // Sync when tab regains focus
+  window.addEventListener("focus", loadRemote);
 </script>
 </body>
 </html>
