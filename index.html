@@ -428,7 +428,7 @@
     border-radius: 6px;
     cursor: pointer;
     outline: none;
-    width: 118px;
+    width: 175px;
     transition: border-color .2s, background .2s;
     color-scheme: dark;
   }
@@ -746,7 +746,7 @@
 
   function parseDate(str) {
     if (!str) return null;
-    const d = new Date(str + "T00:00:00");
+    const d = new Date(str);
     return isNaN(d) ? null : d;
   }
 
@@ -754,9 +754,7 @@
     if (t.done || !t.due) return false;
     const d = parseDate(t.due);
     if (!d) return false;
-    const today = new Date();
-    today.setHours(0,0,0,0);
-    return d < today;
+    return d < new Date();
   }
 
   function isToday(t) {
@@ -764,8 +762,9 @@
     const d = parseDate(t.due);
     if (!d) return false;
     const today = new Date();
-    today.setHours(0,0,0,0);
-    return d.getTime() === today.getTime();
+    return d.getFullYear() === today.getFullYear() &&
+           d.getMonth() === today.getMonth() &&
+           d.getDate() === today.getDate();
   }
 
   function daysUntil(t) {
@@ -774,13 +773,24 @@
     if (!d) return null;
     const today = new Date();
     today.setHours(0,0,0,0);
-    return Math.round((d - today) / 86400000);
+    const dueDay = new Date(d);
+    dueDay.setHours(0,0,0,0);
+    return Math.round((dueDay - today) / 86400000);
   }
 
   function formatDateShort(str) {
     const d = parseDate(str);
     if (!d) return "";
-    return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+    const today = new Date();
+    today.setHours(0,0,0,0);
+    const dueDay = new Date(d);
+    dueDay.setHours(0,0,0,0);
+    const days = Math.round((dueDay - today) / 86400000);
+    const time = d.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+    if (days === 0) return "Today " + time;
+    if (days === 1) return "Tomorrow " + time;
+    if (days === -1) return "Yesterday " + time;
+    return d.toLocaleDateString(undefined, { month: "short", day: "numeric" }) + " " + time;
   }
 
   function dueBadgeClass(t) {
@@ -872,14 +882,14 @@
 
     const dueBadge = document.createElement("span");
     dueBadge.className = "due-badge " + dueBadgeClass(t);
-    let badgeText = "+ date";
+    let badgeText = "+ date/time";
     if (t.due) {
       const days = daysUntil(t);
       badgeText = formatDateShort(t.due);
       if (days < 0 && !t.done) badgeText = "⚠ " + formatDateShort(t.due);
     }
     dueBadge.textContent = badgeText;
-    dueBadge.title = t.due ? `Due ${formatDateShort(t.due)}` : "Set due date";
+    dueBadge.title = t.due ? `Due ${formatDateShort(t.due)}` : "Set due date & time";
     dueBadge.addEventListener("click", () => {
       dueInput.style.display = "block";
       dueBadge.style.display = "none";
@@ -887,7 +897,7 @@
     });
 
     const dueInput = document.createElement("input");
-    dueInput.type = "date";
+    dueInput.type = "datetime-local";
     dueInput.className = "due-input";
     dueInput.value = t.due || "";
     dueInput.style.display = "none";
