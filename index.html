@@ -1052,7 +1052,14 @@
     btn.className = "mini-btn";
     btn.type = "submit";
     btn.textContent = "Add";
-    form.append(input, btn);
+    const cancel = document.createElement("button");
+    cancel.type = "button";
+    cancel.className = "icon-btn del-group";
+    cancel.innerHTML = "&times;";
+    cancel.title = "Cancel";
+    cancel.setAttribute("aria-label", "Cancel");
+    cancel.addEventListener("click", () => form.remove());
+    form.append(input, btn, cancel);
     form.addEventListener("submit", e => {
       e.preventDefault();
       onSubmit(input.value);
