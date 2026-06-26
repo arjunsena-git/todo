@@ -658,18 +658,58 @@
       const data = await res.json();
       const remote = data.record;
       if (remote && remote.work && remote.personal) {
-        state = remote;
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-        normalizeNode(state.work);
-        normalizeNode(state.personal);
-        setSyncStatus("Synced from cloud", "synced");
-        render();
+        normalizeNode(remote.work);
+        normalizeNode(remote.personal);
+        // Only re-render if data actually changed
+        if (JSON.stringify(remote) !== JSON.stringify(state)) {
+          // Preserve focus and in-progress input before re-rendering
+          const focusInfo = saveFocus();
+          state = remote;
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+          setSyncStatus("Synced from cloud", "synced");
+          render();
+          restoreFocus(focusInfo);
+        } else {
+          setSyncStatus("Synced", "synced");
+        }
       } else {
         setSyncStatus("Cloud empty, using local", "synced");
       }
     } catch (e) {
       setSyncStatus("Offline — using local data", "error");
     }
+  }
+
+  function saveFocus() {
+    const el = document.activeElement;
+    if (!el || el === document.body) return null;
+    const info = {
+      tag: el.tagName,
+      value: el.value,
+      selStart: el.selectionStart,
+      selEnd: el.selectionEnd,
+      taskid: el.dataset?.taskid,
+      groupid: el.dataset?.groupid,
+      placeholder: el.placeholder
+    };
+    return info;
+  }
+
+  function restoreFocus(info) {
+    if (!info) return;
+    setTimeout(() => {
+      let target = null;
+      if (info.taskid) target = document.querySelector(`[data-taskid="${info.taskid}"] .item-text`);
+      else if (info.groupid) target = document.querySelector(`[data-groupid="${info.groupid}"] .group-name`);
+      else if (info.placeholder) {
+        target = document.querySelector(`.add-row input[placeholder="${CSS.escape(info.placeholder)}"]`);
+      }
+      if (target) {
+        target.focus();
+        if (info.value !== undefined) target.value = info.value;
+        if (info.selStart !== null) target.setSelectionRange(info.selStart, info.selEnd);
+      }
+    }, 0);
   }
 
   function setSyncStatus(msg, cls) {
@@ -1054,10 +1094,10 @@
     btn.textContent = "Add";
     const cancel = document.createElement("button");
     cancel.type = "button";
-    cancel.className = "icon-btn del-group";
-    cancel.innerHTML = "&times;";
-    cancel.title = "Cancel";
-    cancel.setAttribute("aria-label", "Cancel");
+    cancel.className = "mini-btn";
+    cancel.style.background = "rgba(255,255,255,0.08)";
+    cancel.style.color = "var(--text-dim)";
+    cancel.textContent = "Cancel";
     cancel.addEventListener("click", () => form.remove());
     form.append(input, btn, cancel);
     form.addEventListener("submit", e => {
