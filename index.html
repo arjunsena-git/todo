@@ -764,8 +764,11 @@
   async function loadRemote() {
     setSyncStatus("Syncing…", "syncing");
     try {
-      const res = await fetchWithTimeout(JSONBIN_URL + "/latest", {
-        headers: { "X-Master-Key": JSONBIN_API_KEY }
+      const res = await fetchWithTimeout(JSONBIN_URL + "/latest?t=" + Date.now(), {
+        headers: {
+          "X-Master-Key": JSONBIN_API_KEY,
+          "Cache-Control": "no-cache"
+        }
       });
       if (!res.ok) throw new Error("HTTP " + res.status);
       const data = await res.json();
@@ -1837,8 +1840,11 @@
   // Poll for changes from other devices every 30 seconds
   setInterval(loadRemote, 30000);
 
-  // Sync when tab regains focus
+  // Sync when tab regains focus (desktop) or becomes visible (mobile)
   window.addEventListener("focus", loadRemote);
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible") loadRemote();
+  });
 </script>
 </body>
 </html>
