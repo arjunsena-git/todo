@@ -1155,6 +1155,31 @@
   // ---- Timer ----
   let timers = {};
 
+  function extendTimer(cat, taskId, minutes) {
+    minutes = parseInt(minutes);
+    if (!minutes || minutes <= 0) return;
+    function walk(node) {
+      const t = node.tasks.find(t => t.id === taskId);
+      if (t) {
+        if (!t.timer) return true;
+        const addMs = minutes * 60 * 1000;
+        // If running, extend the remaining time; otherwise just bump the stored duration.
+        if (t.timerStarted) {
+          t.timerRemaining = (t.timerRemaining || t.timer * 60000) + addMs;
+        } else if (t.timerRemaining && t.timerRemaining > 0) {
+          t.timerRemaining += addMs;
+        } else {
+          t.timerRemaining = (t.timer * 60000) + addMs;
+        }
+        t.timer += minutes;
+        return true;
+      }
+      return node.children.some(walk);
+    }
+    walk(state[cat]);
+    save(); render();
+  }
+
   function setTimer(cat, taskId, minutes) {
     function walk(node) {
       const t = node.tasks.find(t => t.id === taskId);
@@ -1325,6 +1350,37 @@
     const timerWrap = document.createElement("div");
     timerWrap.className = "timer-wrap";
 
+    const extendBadge = document.createElement("span");
+    extendBadge.className = "timer-badge";
+    extendBadge.style.display = (t.timerStarted) ? "" : "none";
+    extendBadge.textContent = "+min";
+    extendBadge.title = "Add more time to running timer";
+    extendBadge.addEventListener("click", () => {
+      extendInput.style.display = "block";
+      extendBadge.style.display = "none";
+      extendInput.focus();
+      extendInput.select();
+    });
+
+    const extendInput = document.createElement("input");
+    extendInput.type = "number";
+    extendInput.className = "timer-input";
+    extendInput.placeholder = "+min";
+    extendInput.min = 1;
+    extendInput.max = 999;
+    extendInput.style.display = "none";
+    extendInput.addEventListener("change", () => {
+      if (extendInput.value) extendTimer(cat, t.id, extendInput.value);
+    });
+    extendInput.addEventListener("blur", () => {
+      extendInput.style.display = "none";
+      extendBadge.style.display = (t.timerStarted) ? "" : "none";
+    });
+    extendInput.addEventListener("keydown", e => {
+      if (e.key === "Enter") extendInput.blur();
+      if (e.key === "Escape") { extendInput.value = ""; extendInput.blur(); }
+    });
+
     const timerBadge = document.createElement("span");
     const completed = (t.timerRemaining === 0);
     timerBadge.className = "timer-badge" + (t.timerStarted ? " running" : "") + (completed ? " done-pulse" : "");
@@ -1379,7 +1435,7 @@
       if (e.key === "Escape") { timerInput.value = ""; timerInput.blur(); }
     });
 
-    timerWrap.append(timerBadge, timerInput);
+    timerWrap.append(timerBadge, timerInput, extendBadge, extendInput);
 
     const dueWrap = document.createElement("div");
     dueWrap.className = "due-wrap";
