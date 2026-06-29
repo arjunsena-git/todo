@@ -761,6 +761,28 @@
     }
   }
 
+  // Apply a freshly-fetched remote snapshot, preserving the user's focus
+  // and any in-progress typing as best we can.
+  function applyRemote(remote) {
+    const focusInfo = saveFocus();
+    state = remote;
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    setSyncStatus("Synced from cloud", "synced");
+    render();
+    restoreFocus(focusInfo);
+  }
+
+  function isEditing() {
+    const active = document.activeElement;
+    if (!active || active === document.body) return false;
+    if (!document.hasFocus()) return false;
+    const tag = active.tagName;
+    if (tag !== "INPUT" && tag !== "TEXTAREA") return false;
+    // A read-only field isn't "typing".
+    if (active.readOnly) return false;
+    return true;
+  }
+
   async function loadRemote() {
     setSyncStatus("Syncing…", "syncing");
     try {
@@ -778,13 +800,17 @@
         normalizeNode(remote.personal);
         // Only re-render if data actually changed
         if (JSON.stringify(remote) !== JSON.stringify(state)) {
-          // Preserve focus and in-progress input before re-rendering
-          const focusInfo = saveFocus();
-          state = remote;
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-          setSyncStatus("Synced from cloud", "synced");
-          render();
-          restoreFocus(focusInfo);
+          // Don't re-render while the user is actively typing — a full
+          // re-render wipes the field they're editing (the in-progress text
+          // isn't in state yet, since renameTask only fires on blur). Hold off
+          // and let the next poll / tab-focus sync reconcile once they're done.
+          // By then their own edit has been PUT to the cloud, so the fresh
+          // fetch will include it and won't clobber it.
+          if (isEditing()) {
+            setSyncStatus("Synced — holding changes while you type", "synced");
+          } else {
+            applyRemote(remote);
+          }
         } else {
           setSyncStatus("Synced", "synced");
         }
@@ -799,31 +825,42 @@
   function saveFocus() {
     const el = document.activeElement;
     if (!el || el === document.body) return null;
-    const info = {
+    // data-taskid / data-groupid live on ancestor elements, not on the
+    // input/textarea itself, so climb up to find them.
+    const taskAncestor = el.closest ? el.closest("[data-taskid]") : null;
+    const groupAncestor = el.closest ? el.closest("[data-groupid]") : null;
+    return {
       tag: el.tagName,
       value: el.value,
       selStart: el.selectionStart,
       selEnd: el.selectionEnd,
-      taskid: el.dataset?.taskid,
-      groupid: el.dataset?.groupid,
+      taskid: taskAncestor ? taskAncestor.dataset.taskid : null,
+      groupid: groupAncestor ? groupAncestor.dataset.groupid : null,
       placeholder: el.placeholder
     };
-    return info;
   }
 
   function restoreFocus(info) {
     if (!info) return;
     setTimeout(() => {
       let target = null;
-      if (info.taskid) target = document.querySelector(`[data-taskid="${info.taskid}"] .item-text`);
-      else if (info.groupid) target = document.querySelector(`[data-groupid="${info.groupid}"] .group-name`);
-      else if (info.placeholder) {
+      if (info.taskid) {
+        const li = document.querySelector(`[data-taskid="${info.taskid}"]`);
+        if (li) target = li.querySelector(".item-text");
+      } else if (info.groupid) {
+        const g = document.querySelector(`[data-groupid="${info.groupid}"]`);
+        if (g) target = g.querySelector(".group-name");
+      } else if (info.placeholder) {
         target = document.querySelector(`.add-row input[placeholder="${CSS.escape(info.placeholder)}"]`);
       }
       if (target) {
         target.focus();
-        if (info.value !== undefined) target.value = info.value;
-        if (info.selStart !== null) target.setSelectionRange(info.selStart, info.selEnd);
+        // Restore the in-progress value the user was typing (which hasn't been
+        // committed to state yet, since renameTask fires on blur).
+        if (info.value !== undefined && info.value !== null) target.value = info.value;
+        if (info.selStart !== null && info.selStart !== undefined) {
+          try { target.setSelectionRange(info.selStart, info.selEnd); } catch (_) {}
+        }
       }
     }, 0);
   }
