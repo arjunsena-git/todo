@@ -969,17 +969,19 @@
 
   function deleteTask(cat, taskId) {
     const el = document.querySelector(`[data-taskid="${taskId}"]`);
-    const doRemove = () => {
-      function walk(node) {
-        const i = node.tasks.findIndex(t => t.id === taskId);
-        if (i >= 0) { node.tasks.splice(i, 1); return true; }
-        return node.children.some(walk);
-      }
-      walk(state[cat]);
-      save(); render();
-    };
-    if (el) { el.classList.add("removing"); setTimeout(doRemove, 220); }
-    else doRemove();
+    // Remove from state and persist immediately so a focus-triggered
+    // loadRemote() can't clobber the deletion with stale remote data.
+    function walk(node) {
+      const i = node.tasks.findIndex(t => t.id === taskId);
+      if (i >= 0) { node.tasks.splice(i, 1); return true; }
+      return node.children.some(walk);
+    }
+    walk(state[cat]);
+    save();
+    if (el) {
+      el.classList.add("removing");
+      setTimeout(() => render(), 220);
+    } else render();
   }
 
   function renameTask(cat, taskId, val) {
@@ -1110,21 +1112,21 @@
 
   function deleteGroup(cat, groupId) {
     const el = document.querySelector(`[data-groupid="${groupId}"]`);
-    const doRemove = () => {
-      function walk(node) {
-        const i = node.children.findIndex(c => c.id === groupId);
-        if (i >= 0) { node.children.splice(i, 1); return true; }
-        return node.children.some(walk);
-      }
-      walk(state[cat]);
-      save(); render();
-    };
+    // Remove from state and persist immediately so a focus-triggered
+    // loadRemote() can't clobber the deletion with stale remote data.
+    function walk(node) {
+      const i = node.children.findIndex(c => c.id === groupId);
+      if (i >= 0) { node.children.splice(i, 1); return true; }
+      return node.children.some(walk);
+    }
+    walk(state[cat]);
+    save();
     if (el) {
       el.style.transition = "opacity .25s, transform .25s";
       el.style.opacity = "0";
       el.style.transform = "translateX(40px)";
-      setTimeout(doRemove, 250);
-    } else doRemove();
+      setTimeout(() => render(), 250);
+    } else render();
   }
 
   function toggleCollapse(cat, groupId) {
