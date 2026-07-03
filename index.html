@@ -718,6 +718,9 @@
   const JSONBIN_URL = `https://api.jsonbin.io/v3/b/${JSONBIN_BIN_ID}`;
   let filter = "all";
   let syncTimer = null;
+  // True when there are local changes that haven't been PUT to the cloud yet.
+  // Prevents a stale remote fetch from clobbering unsaved local edits.
+  let dirty = false;
 
   // Abort any in-flight sync request so a blocked/proxied network
   // fails fast instead of hanging forever on "Syncing…".
@@ -808,6 +811,11 @@
           // fetch will include it and won't clobber it.
           if (isEditing()) {
             setSyncStatus("Synced — holding changes while you type", "synced");
+          } else if (dirty) {
+            // We have local changes that haven't been PUT to the cloud yet.
+            // Don't let a stale remote snapshot clobber them — our pending PUT
+            // will sync local → cloud, and the next poll will reconcile.
+            setSyncStatus("Synced — keeping local changes", "synced");
           } else {
             applyRemote(remote);
           }
@@ -898,6 +906,7 @@
           body: JSON.stringify(state)
         });
         if (!res.ok) throw new Error("HTTP " + res.status);
+        dirty = false;
         setSyncStatus("Synced to cloud", "synced");
       } catch (e) {
         setSyncStatus("Save failed — changes saved locally", "error");
@@ -906,6 +915,7 @@
   }
 
   function save() {
+    dirty = true;
     saveLocal();
     saveRemote();
   }
