@@ -1695,8 +1695,20 @@
     col.classList.toggle("hidden", !!hiddenPanels[cat]);
     // Remove everything except the header and restore button
     const header = col.querySelector(".col-head");
+    let restore = col.querySelector(".col-restore");
     col.innerHTML = "";
     col.appendChild(header);
+    // Always (re)create the restore button so it survives innerHTML wipes
+    restore = document.createElement("button");
+    restore.className = "col-restore";
+    restore.id = "restore-" + cat;
+    restore.innerHTML = "&#128065; Show " + (cat === "work" ? "Work" : "Personal") + " panel";
+    restore.addEventListener("click", () => {
+      hiddenPanels[cat] = false;
+      save();
+      render();
+    });
+    col.appendChild(restore);
 
     const root = state[cat];
 
