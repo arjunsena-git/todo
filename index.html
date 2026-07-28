@@ -404,11 +404,23 @@
     flex-shrink: 0;
     opacity: 0.4;
     transition: opacity .2s;
+    touch-action: none;
   }
   .drag-handle:hover { opacity: 1; }
   .drag-handle:active { cursor: grabbing; }
   .item.dragging { opacity: 0.4; }
   .item.drag-over { border-color: rgba(255,255,255,0.4); background: rgba(255,255,255,0.1); }
+  .touch-ghost {
+    position: fixed;
+    left: 0; top: 0;
+    margin: 0;
+    list-style: none;
+    pointer-events: none;
+    z-index: 9999;
+    opacity: 0.92;
+    transform: scale(1.03);
+    box-shadow: 0 10px 28px rgba(0,0,0,0.45);
+  }
 
   .timer-wrap {
     display: flex;
@@ -811,6 +823,10 @@
           // fetch will include it and won't clobber it.
           if (isEditing()) {
             setSyncStatus("Synced — holding changes while you type", "synced");
+          } else if (touchDrag && touchDrag.started) {
+            // A touch drag is in progress; a re-render would wipe the list
+            // mid-drag. Hold off — the next poll reconciles after the drop.
+            setSyncStatus("Synced — holding changes while you drag", "synced");
           } else if (dirty) {
             // We have local changes that haven't been PUT to the cloud yet.
             // Don't let a stale remote snapshot clobber them — our pending PUT
@@ -1204,6 +1220,92 @@
     save(); render();
   }
 
+  // ---- Touch drag-and-drop (mobile) ----
+  // The HTML5 DnD API (draggable/dragstart/drop) never fires on touch
+  // devices, so we simulate it with touch events on the drag handle.
+  // Touching elsewhere on an item keeps normal scroll/select behaviour.
+  let touchDrag = null;
+
+  function onTouchHandleStart(e, cat, taskId, parentId) {
+    if (e.touches.length !== 1 || touchDrag) return;
+    const t = e.touches[0];
+    touchDrag = {
+      cat: cat, taskId: taskId, parentId: parentId,
+      startX: t.clientX, startY: t.clientY,
+      started: false, ghost: null, lastOverId: null
+    };
+    document.addEventListener("touchmove", onTouchMove, { passive: false });
+    document.addEventListener("touchend", onTouchEnd, { passive: false });
+    document.addEventListener("touchcancel", onTouchEnd, { passive: false });
+  }
+
+  function touchStartActual(x, y) {
+    if (!touchDrag || touchDrag.started) return;
+    touchDrag.started = true;
+    const src = document.querySelector('[data-taskid="' + touchDrag.taskId + '"]');
+    if (src) src.classList.add("dragging");
+    // Keep dragData in sync so desktop handlers that read it agree.
+    dragData = { cat: touchDrag.cat, taskId: touchDrag.taskId, parentId: touchDrag.parentId };
+    if (src) {
+      const g = src.cloneNode(true);
+      g.classList.remove("dragging");
+      g.classList.add("touch-ghost");
+      g.style.width = src.offsetWidth + "px";
+      document.body.appendChild(g);
+      touchDrag.ghost = g;
+    }
+    positionGhost(x, y);
+  }
+
+  function positionGhost(x, y) {
+    if (!touchDrag || !touchDrag.ghost) return;
+    touchDrag.ghost.style.left = x + "px";
+    touchDrag.ghost.style.top = y + "px";
+  }
+
+  function onTouchMove(e) {
+    if (!touchDrag || e.touches.length !== 1) return;
+    const t = e.touches[0];
+    const x = t.clientX, y = t.clientY;
+    if (!touchDrag.started) {
+      const dx = x - touchDrag.startX, dy = y - touchDrag.startY;
+      if (Math.abs(dx) < 6 && Math.abs(dy) < 6) return; // ignore taps
+      touchStartActual(x, y);
+    }
+    e.preventDefault(); // stop the page from scrolling while dragging
+    positionGhost(x, y);
+    const el = document.elementFromPoint(x, y);
+    const target = el ? el.closest("li.item[data-taskid]") : null;
+    document.querySelectorAll(".drag-over").forEach(function (elx) { elx.classList.remove("drag-over"); });
+    if (target && target.dataset.taskid !== touchDrag.taskId) {
+      target.classList.add("drag-over");
+      touchDrag.lastOverId = target.dataset.taskid;
+    } else {
+      touchDrag.lastOverId = null;
+    }
+  }
+
+  function onTouchEnd() {
+    document.removeEventListener("touchmove", onTouchMove);
+    document.removeEventListener("touchend", onTouchEnd);
+    document.removeEventListener("touchcancel", onTouchEnd);
+    if (!touchDrag) return;
+    const src = document.querySelector('[data-taskid="' + touchDrag.taskId + '"]');
+    if (src) src.classList.remove("dragging");
+    if (touchDrag.ghost) touchDrag.ghost.remove();
+    document.querySelectorAll(".drag-over").forEach(function (elx) { elx.classList.remove("drag-over"); });
+    if (touchDrag.started && touchDrag.lastOverId) {
+      const tgt = document.querySelector('[data-taskid="' + touchDrag.lastOverId + '"]');
+      if (tgt) {
+        const groupAncestor = tgt.closest("[data-groupid]");
+        const targetParentId = groupAncestor ? groupAncestor.dataset.groupid : null;
+        reorderTask(touchDrag.cat, touchDrag.taskId, touchDrag.parentId, touchDrag.lastOverId, targetParentId);
+      }
+    }
+    touchDrag = null;
+    dragData = null;
+  }
+
   // ---- Timer ----
   let timers = {};
 
@@ -1367,6 +1469,7 @@
     dragHandle.className = "drag-handle";
     dragHandle.innerHTML = "&#8942;&#8942;";
     dragHandle.title = "Drag to reorder";
+    dragHandle.addEventListener("touchstart", e => onTouchHandleStart(e, cat, t.id, parentId), { passive: true });
 
     const cb = document.createElement("div");
     cb.className = "checkbox";
