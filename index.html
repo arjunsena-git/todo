@@ -67,17 +67,6 @@
   .sync-status.syncing { color: #fcd34d; }
   .sync-status.synced { color: #4ade80; }
   .sync-status.error { color: var(--danger); }
-  .sync-status .sync-action {
-    margin-left: 8px;
-    border: none;
-    background: transparent;
-    color: inherit;
-    font: inherit;
-    font-weight: 700;
-    text-decoration: underline;
-    cursor: pointer;
-  }
-
   .progress-wrap {
     max-width: 480px;
     margin: 18px auto 0;
@@ -710,7 +699,6 @@
     <button class="filter-btn" data-filter="overdue">Overdue</button>
     <button class="filter-btn" data-filter="collapse">Collapse all</button>
     <button class="filter-btn" data-filter="clear">Clear completed</button>
-    <button class="filter-btn" id="syncSettings" type="button">Sync setup</button>
   </div>
 
   <div class="columns">
@@ -736,18 +724,10 @@
 
 <script>
   const STORAGE_KEY = "todo.arjun.v2";
-  // Cloud sync now backs onto a file in the GitHub repo itself
-  // (branch `data`, path `state.json`) instead of jsonbin.io, whose
-  // free request quota was exhausted. The cloud is still source of truth;
-  // localStorage caches locally and reconciles on focus / visibility / 30s poll.
-  const GH_REPO = "arjunsena-git/todo";
-  const GH_BRANCH = "data";
-  const GH_PATH = "state.json";
-  const GH_TOKEN_KEY = STORAGE_KEY + ".githubToken";
-  const GH_API = `https://api.github.com/repos/${GH_REPO}/contents/${GH_PATH}`;
-  const GH_READ_API = `${GH_API}?ref=${GH_BRANCH}`;
-  // Last-known SHA of the remote state file (needed to update an existing file).
-  let remoteSha = null;
+  // Cloud sync goes through a tiny Vercel function. The function keeps the
+  // GitHub token server-side and reads/writes branch `data`, path `state.json`,
+  // so every browser can auto-sync without storing a token locally.
+  const SYNC_API = "https://projects-todo-indol.vercel.app/api/sync";
   let filter = "all";
   let syncTimer = null;
   // True when there are local changes that haven't been PUT to the cloud yet.
@@ -769,55 +749,6 @@
     const t = setTimeout(() => syncAbort.abort(), ms);
     return fetch(url, { ...options, signal: syncAbort.signal })
       .finally(() => { clearTimeout(t); syncAbort = null; });
-  }
-
-  function getGithubToken() {
-    return (localStorage.getItem(GH_TOKEN_KEY) || "").trim();
-  }
-
-  function githubHeaders(token, includeContentType) {
-    const headers = {
-      "Accept": "application/vnd.github+json",
-      "Cache-Control": "no-cache"
-    };
-    if (token) headers.Authorization = "Bearer " + token;
-    if (includeContentType) headers["Content-Type"] = "application/json";
-    return headers;
-  }
-
-  function promptForGithubToken(reason) {
-    const token = window.prompt(
-      (reason ? reason + "\n\n" : "") +
-      "Paste a fine-grained GitHub token for arjunsena-git/todo with Contents: Read and write. It will be saved only in this browser."
-    );
-    if (!token) return "";
-    localStorage.setItem(GH_TOKEN_KEY, token.trim());
-    return token.trim();
-  }
-
-  function configureSyncToken() {
-    const existing = getGithubToken();
-    const token = window.prompt(
-      existing
-        ? "A GitHub sync token is saved in this browser. Paste a replacement, type REMOVE to forget it, or leave blank to keep it."
-        : "Paste a fine-grained GitHub token for arjunsena-git/todo with Contents: Read and write."
-    );
-    if (token === null) return;
-    const next = token.trim();
-    if (!next && existing) {
-      loadRemote();
-      return;
-    }
-    if (next.toUpperCase() === "REMOVE") {
-      localStorage.removeItem(GH_TOKEN_KEY);
-      setSyncStatus("Sync token removed", "error");
-      return;
-    }
-    if (next) {
-      localStorage.setItem(GH_TOKEN_KEY, next);
-      setSyncStatus("Sync token saved", "synced");
-      loadRemote();
-    }
   }
 
   // Tree state: each root has tasks[] and children[] (groups). Each group same shape.
@@ -867,46 +798,27 @@
     return true;
   }
 
-  // Base64 helpers that survive UTF-8 (todos may contain non-ASCII).
-  function b64encode(str) {
-    return btoa(unescape(encodeURIComponent(str)));
-  }
-  function b64decode(b64) {
-    return decodeURIComponent(escape(atob(b64.replace(/\n/g, ""))));
-  }
-
   async function loadRemote() {
     setSyncStatus("Syncing…", "syncing");
     try {
-      const res = await fetchWithTimeout(GH_READ_API + "&t=" + Date.now(), {
-        headers: githubHeaders(getGithubToken(), false)
+      const res = await fetchWithTimeout(SYNC_API + "?t=" + Date.now(), {
+        headers: { "Cache-Control": "no-cache" }
       });
       if (res.status === 404) {
         // No cloud state yet — first device to come online seeds the store.
-        remoteSha = null;
         const hasLocal = (state.work?.tasks?.length || state.work?.children?.length ||
                           state.personal?.tasks?.length || state.personal?.children?.length);
         if (hasLocal) {
-          if (getGithubToken()) {
-            setSyncStatus("Seeding cloud…", "syncing");
-            saveRemote();
-          } else {
-            setSyncStatus("Sync setup needed", "error", true);
-          }
+          setSyncStatus("Seeding cloud…", "syncing");
+          saveRemote();
         } else {
           setSyncStatus("Cloud empty, using local", "synced");
         }
         return;
       }
-      if (res.status === 401 || res.status === 403) {
-        localStorage.removeItem(GH_TOKEN_KEY);
-        setSyncStatus("Sync token rejected", "error", true);
-        return;
-      }
       if (!res.ok) throw new Error("HTTP " + res.status);
       const data = await res.json();
-      remoteSha = data.sha;
-      const remote = JSON.parse(b64decode(data.content));
+      const remote = data.state;
       if (remote && remote.work && remote.personal) {
         normalizeNode(remote.work);
         normalizeNode(remote.personal);
@@ -986,18 +898,10 @@
     }, 0);
   }
 
-  function setSyncStatus(msg, cls, showSetup) {
+  function setSyncStatus(msg, cls) {
     const el = document.getElementById("syncStatus");
     el.textContent = msg;
     el.className = "sync-status" + (cls ? " " + cls : "");
-    if (showSetup) {
-      const btn = document.createElement("button");
-      btn.type = "button";
-      btn.className = "sync-action";
-      btn.textContent = "Set up";
-      btn.addEventListener("click", configureSyncToken);
-      el.appendChild(btn);
-    }
   }
 
   function normalizeNode(n) {
@@ -1013,57 +917,21 @@
     localStorage.setItem(STORAGE_KEY + ".hidden", JSON.stringify(hiddenPanels));
   }
 
-  // PUT local state to the GitHub file. Uses remoteSha for optimistic
-  // concurrency; on 409 (someone else moved the file) it re-reads the sha
-  // and retries once, so the last writer wins — matching the old jsonbin
-  // overwrite semantics. Uses a per-call AbortController so a focus-triggered
-  // loadRemote() never aborts an in-flight write.
-  async function putState(retryOnConflict) {
-    const token = getGithubToken() || promptForGithubToken("GitHub sync needs a token before it can save changes.");
-    if (!token) throw new Error("Missing GitHub token");
-    const body = {
-      message: "sync: update todo state",
-      content: b64encode(JSON.stringify(state)),
-      branch: GH_BRANCH
-    };
-    if (remoteSha) body.sha = remoteSha;
-    const ctrl = new AbortController();
-    const t = setTimeout(() => ctrl.abort(), 9000);
-    try {
-      const res = await fetch(GH_API, {
-        method: "PUT",
-        headers: githubHeaders(token, true),
-        body: JSON.stringify(body),
-        signal: ctrl.signal
-      });
-      if (res.status === 409 && retryOnConflict) {
-        // Our sha is stale — refresh it, then retry the write once.
-        await loadRemote();
-        return putState(false);
-      }
-      if (res.status === 401 || res.status === 403) {
-        localStorage.removeItem(GH_TOKEN_KEY);
-        throw new Error("GitHub token rejected");
-      }
-      if (!res.ok) throw new Error("HTTP " + res.status);
-      const data = await res.json();
-      if (data && data.content && data.content.sha) remoteSha = data.content.sha;
-      return true;
-    } finally {
-      clearTimeout(t);
-    }
-  }
-
   function saveRemote() {
     clearTimeout(syncTimer);
     syncTimer = setTimeout(async () => {
       setSyncStatus("Syncing…", "syncing");
       try {
-        await putState(true);
+        const res = await fetch(SYNC_API, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(state)
+        });
+        if (!res.ok) throw new Error("HTTP " + res.status);
         dirty = false;
         setSyncStatus("Synced to cloud", "synced");
       } catch (e) {
-        setSyncStatus("Save failed — changes saved locally", "error", !getGithubToken());
+        setSyncStatus("Save failed — changes saved locally", "error");
       }
     }, 800);
   }
@@ -2111,8 +1979,6 @@
     });
     render();
   });
-
-  document.getElementById("syncSettings").addEventListener("click", configureSyncToken);
 
   // Hide / restore panels
   ["work", "personal"].forEach(cat => {
