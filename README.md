@@ -4,4 +4,4 @@ A single-file HTML todo app with Work / Personal panels, nested groups, due date
 
 ## Usage
 
-Open the live site at https://arjunsena-git.github.io/todo/ or run `index.html` locally in any browser. Data syncs across devices via jsonbin.io.
+Open the live site at https://arjunsena-git.github.io/todo/ or run `index.html` locally in any browser. Data syncs across devices through `state.json` on the repo's `data` branch; each browser needs a fine-grained GitHub token saved through **Sync setup** before it can write changes.
