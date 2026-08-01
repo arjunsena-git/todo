@@ -801,9 +801,7 @@
   async function loadRemote() {
     setSyncStatus("Syncing…", "syncing");
     try {
-      const res = await fetchWithTimeout(SYNC_API + "?t=" + Date.now(), {
-        headers: { "Cache-Control": "no-cache" }
-      });
+      const res = await fetchWithTimeout(SYNC_API + "?t=" + Date.now(), {});
       if (res.status === 404) {
         // No cloud state yet — first device to come online seeds the store.
         const hasLocal = (state.work?.tasks?.length || state.work?.children?.length ||

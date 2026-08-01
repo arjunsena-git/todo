@@ -14,7 +14,7 @@ function corsHeaders(req) {
   return {
     "Access-Control-Allow-Origin": allowedOrigin,
     "Access-Control-Allow-Methods": "GET, PUT, OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type",
+    "Access-Control-Allow-Headers": "Content-Type, Cache-Control",
     "Access-Control-Max-Age": "86400",
     "Vary": "Origin"
   };
